@@ -7,10 +7,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bullmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import type { RedisConfig } from './common/config/configuration';
 
 import configuration from './common/config/configuration';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
+import { StorageModule } from './common/storage/storage.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { CapabilitiesGuard } from './common/guards/capabilities.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -33,6 +37,22 @@ import { AuditModule } from './modules/audit/audit.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
+    EventEmitterModule.forRoot(),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const redis = config.getOrThrow<RedisConfig>('redis');
+        return {
+          connection: { host: redis.host, port: redis.port, password: redis.password },
+          defaultJobOptions: {
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 5_000 },
+            removeOnComplete: 1000,
+            removeOnFail: 5000,
+          },
+        };
+      },
+    }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => [
@@ -44,6 +64,7 @@ import { AuditModule } from './modules/audit/audit.module';
     }),
     PrismaModule,
     RedisModule,
+    StorageModule,
     AuthModule,
     ContentModule,
     UserModule,

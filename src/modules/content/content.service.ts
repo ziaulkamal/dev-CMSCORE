@@ -3,8 +3,11 @@
  * Logika Content: CRUD, slug unik per type, EAV meta, listing feed, transisi status.
  */
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ContentStatus, Prisma } from '@prisma/client';
 import { ContentRepository } from './content.repository';
+import { ScheduledPublishService } from './scheduled-publish.service';
+import { APP_EVENTS } from '../../common/events/app-events';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
 import { TransitionDto } from './dto/transition.dto';
@@ -29,7 +32,11 @@ import {
 
 @Injectable()
 export class ContentService {
-  constructor(private readonly repo: ContentRepository) {}
+  constructor(
+    private readonly repo: ContentRepository,
+    private readonly scheduler: ScheduledPublishService,
+    private readonly events: EventEmitter2,
+  ) {}
 
   /** Buat content + meta + authors + terms dalam satu transaksi. */
   async create(dto: CreateContentDto, user: AuthenticatedUser) {
@@ -154,7 +161,44 @@ export class ContentService {
     }
 
     const data = this.buildTransitionData(to, dto);
-    return this.repo.updateStatus(id, data);
+    const updated = await this.repo.updateStatus(id, data);
+
+    // Sinkronkan job scheduler & pancarkan event sesuai status tujuan.
+    await this.applyScheduling(from, to, updated);
+    return updated;
+  }
+
+  /** Kelola job terjadwal & event saat status berpindah. */
+  private async applyScheduling(
+    from: ContentStatus,
+    to: ContentStatus,
+    content: {
+      id: string;
+      type: string;
+      slug: string;
+      scheduledAt: Date | null;
+      publishedAt: Date | null;
+    },
+  ): Promise<void> {
+    if (to === 'scheduled' && content.scheduledAt) {
+      await this.scheduler.schedule(content.id, content.scheduledAt);
+      return;
+    }
+    // Keluar dari scheduled (selain ke scheduled) → batalkan job lama.
+    if (from === 'scheduled' && to !== 'scheduled') {
+      await this.scheduler.cancel(content.id);
+    }
+    if (to === 'published') {
+      this.events.emit(APP_EVENTS.contentPublished, {
+        content_id: content.id,
+        type: content.type,
+        slug: content.slug,
+        published_at: content.publishedAt,
+      });
+    }
+    if (to === 'trashed') {
+      this.events.emit(APP_EVENTS.contentTrashed, { content_id: content.id });
+    }
   }
 
   async getMeta(id: string) {

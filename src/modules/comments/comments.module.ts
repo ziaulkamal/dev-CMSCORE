@@ -1,10 +1,10 @@
-// src/modules/comments/comments.module.ts — wiring modul comments (stub).
+// src/modules/comments/comments.module.ts — wiring modul comments (global + nested).
 import { Module } from '@nestjs/common';
-import { CommentController } from './comments.controller';
+import { CommentController, ContentCommentController } from './comments.controller';
 import { CommentService } from './comments.service';
 
 @Module({
-  controllers: [CommentController],
+  controllers: [CommentController, ContentCommentController],
   providers: [CommentService],
   exports: [CommentService],
 })
