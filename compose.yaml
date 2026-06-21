@@ -6,7 +6,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: docker/Dockerfile.dev
+      dockerfile: Dockerfile.dev
     image: cms-core-dev
     env_file:
       - .env

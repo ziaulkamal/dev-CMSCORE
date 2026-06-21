@@ -1,4 +1,4 @@
-# docker/Dockerfile.dev — image development NestJS dengan hot-reload (pnpm).
+# Dockerfile.dev — image development NestJS dengan hot-reload (pnpm).
 # Source di-mount sebagai volume; container hanya menyiapkan toolchain & deps.
 FROM node:22-alpine
 

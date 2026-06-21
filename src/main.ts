@@ -35,13 +35,35 @@ async function bootstrap() {
   if (appCfg.nodeEnv !== 'production') {
     const swaggerCfg = new DocumentBuilder()
       .setTitle('CMS Core API')
-      .setDescription('Headless Media Publishing REST API')
+      .setDescription(
+        [
+          'Headless Media Publishing REST API.',
+          '',
+          'Autentikasi: kirim `Authorization: Bearer <access_token>` (dari `/auth/login`)',
+          'atau `X-API-Key: <key>`. Endpoint publik tidak butuh keduanya.',
+          'Envelope sukses `{ data, meta? }`, error `{ error: { code, message, details? } }`.',
+        ].join('\n'),
+      )
       .setVersion('1.0')
-      .addBearerAuth()
+      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
       .addApiKey({ type: 'apiKey', name: 'X-API-Key', in: 'header' }, 'api-key')
+      .addTag('Auth', 'Login, refresh rotation, API key')
+      .addTag('Content', 'CRUD konten, status editorial, locking, meta EAV')
+      .addTag('Media', 'Upload & kelola media (MinIO)')
+      .addTag('Taxonomy', 'Taxonomy & term')
+      .addTag('Author', 'Byline publik')
+      .addTag('Comment', 'Komentar & moderasi')
+      .addTag('User', 'Akun login & RBAC')
+      .addTag('Settings', 'Konfigurasi key-value')
+      .addTag('Redirect', 'Redirect URL')
+      .addTag('Webhook', 'Event hooks & delivery')
+      .addTag('Misc', 'Role, menu, widget, audit')
       .build();
     const document = SwaggerModule.createDocument(app, swaggerCfg);
-    SwaggerModule.setup('docs', app, document);
+    SwaggerModule.setup('docs', app, document, {
+      swaggerOptions: { persistAuthorization: true, tagsSorter: 'alpha' },
+      customSiteTitle: 'CMS Core API Docs',
+    });
   }
 
   await app.listen(appCfg.port, '0.0.0.0');

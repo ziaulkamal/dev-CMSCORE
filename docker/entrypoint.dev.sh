@@ -20,5 +20,12 @@ fi
 echo "[entrypoint] seed RBAC & data dasar..."
 pnpm run db:seed || echo "[entrypoint] seed dilewati/gagal (lanjut)."
 
+# Build sekali agar dist/main.js sudah ada sebelum watch start (cegah race
+# 'Cannot find module dist/main' saat nest start --watch). Bersihkan cache
+# incremental supaya perubahan rootDir tidak membuat tsc skip emit.
+echo "[entrypoint] build awal..."
+find . -maxdepth 2 -name '*.tsbuildinfo' -delete 2>/dev/null || true
+pnpm run build
+
 echo "[entrypoint] start: $*"
 exec "$@"
