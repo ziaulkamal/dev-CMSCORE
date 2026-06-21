@@ -1,0 +1,16 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+coverage
+logs
+*.log
+.claude
+PLAN.md
+PRD.md
+README.md
+.podman-data
+volumes

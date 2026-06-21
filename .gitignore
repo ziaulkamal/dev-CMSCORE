@@ -1,0 +1,44 @@
+# ── Dependencies ───────────────────────────────────────────
+node_modules/
+.pnpm-store/
+
+# ── Build output ───────────────────────────────────────────
+dist/
+build/
+*.tsbuildinfo
+
+# ── Environment & secrets ──────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Prisma ─────────────────────────────────────────────────
+prisma/*.db
+prisma/migrations/dev.db*
+
+# ── Logs ───────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ── Coverage & test artifacts ──────────────────────────────
+coverage/
+.nyc_output/
+
+# ── Editor / OS ────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── Container volumes (local dev data) ─────────────────────
+.podman-data/
+volumes/
+
+# ── Project planning & assistant files (jangan di-push) ────
+.claude/
+PLAN.md
+PRD.md
+README.md
