@@ -1,0 +1,460 @@
+// prisma/schema.prisma
+// Sumber kebenaran skema relasional CMS Core (PRD §4). Generalisasi
+// entitas ala WordPress Core: content (post/page/CPT), term+taxonomy, EAV meta.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────────
+
+enum ContentStatus {
+  draft
+  pending_review
+  scheduled
+  published
+  archived
+  trashed
+}
+
+enum AuthorRole {
+  primary
+  co_author
+}
+
+enum CommentStatus {
+  pending
+  approved
+  spam
+  trash
+}
+
+enum RedirectCode {
+  r301
+  r302
+}
+
+// ── RBAC: User / Role / Capability ─────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  status       String   @default("active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  roles            UserRole[]
+  apiKeys          ApiKey[]
+  refreshTokens    RefreshToken[]
+  createdContents  Content[]         @relation("ContentCreatedBy")
+  editedRevisions  ContentRevision[]
+  uploadedMedia    Media[]
+  comments         Comment[]
+  authorProfile    Author?
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+model Role {
+  id    String @id @default(uuid())
+  name  String @unique
+  label String
+
+  users        UserRole[]
+  capabilities RoleCapability[]
+
+  @@map("roles")
+}
+
+model Capability {
+  id          String @id @default(uuid())
+  key         String @unique
+  description String?
+
+  roles RoleCapability[]
+
+  @@map("capabilities")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_role")
+}
+
+model RoleCapability {
+  roleId       String @map("role_id")
+  capabilityId String @map("capability_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  capability Capability @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, capabilityId])
+  @@map("role_capability")
+}
+
+// ── Auth tokens & API keys ─────────────────────────────────
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  rotatedFrom String?   @map("rotated_from")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  keyHash    String    @unique @map("key_hash")
+  label      String
+  scopes     String[]  @default([])
+  lastUsedAt DateTime? @map("last_used_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_keys")
+}
+
+// ── Author (byline publik, terpisah dari akun login) ───────
+
+model Author {
+  id            String  @id @default(uuid())
+  displayName   String  @map("display_name")
+  bio           String?
+  avatarMediaId String? @map("avatar_media_id")
+  socialLinks   Json?   @map("social_links")
+  linkedUserId  String? @unique @map("linked_user_id")
+
+  linkedUser   User?           @relation(fields: [linkedUserId], references: [id], onDelete: SetNull)
+  avatarMedia  Media?          @relation("AuthorAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
+  contents     ContentAuthor[]
+
+  @@map("authors")
+}
+
+// ── Content (generalisasi Page + Post + CPT) ───────────────
+
+model Content {
+  id              String        @id @default(uuid())
+  type            String
+  title           String
+  slug            String
+  body            String?
+  excerpt         String?
+  status          ContentStatus @default(draft)
+  parentId        String?       @map("parent_id")
+  featuredMediaId String?       @map("featured_media_id")
+  primaryAuthorId String?       @map("primary_author_id")
+  menuOrder       Int           @default(0) @map("menu_order")
+  publishedAt     DateTime?     @map("published_at")
+  scheduledAt     DateTime?     @map("scheduled_at")
+  lockedBy        String?       @map("locked_by")
+  lockedAt        DateTime?     @map("locked_at")
+  lockExpiresAt   DateTime?     @map("lock_expires_at")
+  createdById     String?       @map("created_by")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  parent        Content?          @relation("ContentHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Content[]         @relation("ContentHierarchy")
+  featuredMedia Media?            @relation("ContentFeatured", fields: [featuredMediaId], references: [id], onDelete: SetNull)
+  createdBy     User?             @relation("ContentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  authors       ContentAuthor[]
+  metas         ContentMeta[]
+  revisions     ContentRevision[]
+  terms         ContentTerm[]
+  comments      Comment[]
+  attachments   ContentMedia[]
+  menuItems     MenuItem[]
+
+  // slug unik per type (PRD §4)
+  @@unique([type, slug])
+  @@index([type, status])
+  @@index([status, publishedAt])
+  @@map("contents")
+}
+
+model ContentMeta {
+  id        String   @id @default(uuid())
+  contentId String   @map("content_id")
+  metaKey   String   @map("meta_key")
+  metaValue String?  @map("meta_value")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, metaKey])
+  @@index([contentId, metaKey])
+  @@map("content_meta")
+}
+
+model ContentAuthor {
+  contentId String     @map("content_id")
+  authorId  String     @map("author_id")
+  role      AuthorRole @default(co_author)
+  sortOrder Int        @default(0) @map("sort_order")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  author  Author  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, authorId])
+  @@map("content_author")
+}
+
+model ContentRevision {
+  id        String   @id @default(uuid())
+  contentId String   @map("content_id")
+  snapshot  Json
+  editedBy  String?  @map("edited_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  editor  User?   @relation(fields: [editedBy], references: [id], onDelete: SetNull)
+
+  @@index([contentId])
+  @@map("content_revisions")
+}
+
+// ── Taxonomy & Term (generalisasi Category + Tag) ──────────
+
+model Taxonomy {
+  id           String  @id @default(uuid())
+  slug         String  @unique
+  label        String
+  hierarchical Boolean @default(false)
+
+  terms Term[]
+
+  @@map("taxonomies")
+}
+
+model Term {
+  id          String  @id @default(uuid())
+  taxonomyId  String  @map("taxonomy_id")
+  name        String
+  slug        String
+  description String?
+  parentId    String? @map("parent_id")
+
+  taxonomy Taxonomy      @relation(fields: [taxonomyId], references: [id], onDelete: Cascade)
+  parent   Term?         @relation("TermHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Term[]        @relation("TermHierarchy")
+  contents ContentTerm[]
+
+  @@unique([taxonomyId, slug])
+  @@map("terms")
+}
+
+model ContentTerm {
+  contentId String @map("content_id")
+  termId    String @map("term_id")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  term    Term    @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, termId])
+  @@map("content_term")
+}
+
+// ── Media ──────────────────────────────────────────────────
+
+model Media {
+  id              String   @id @default(uuid())
+  fileUrl         String   @map("file_url")
+  storageKey      String   @map("storage_key")
+  mimeType        String   @map("mime_type")
+  fileSize        Int      @map("file_size")
+  width           Int?
+  height          Int?
+  altText         String?  @map("alt_text")
+  caption         String?
+  uploaderId      String?  @map("uploader_id")
+  storageProvider String   @default("minio") @map("storage_provider")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  uploader        User?          @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  featuredFor     Content[]      @relation("ContentFeatured")
+  attachedTo      ContentMedia[]
+  authorAvatars   Author[]       @relation("AuthorAvatar")
+
+  @@map("media")
+}
+
+model ContentMedia {
+  contentId String @map("content_id")
+  mediaId   String @map("media_id")
+  sortOrder Int    @default(0) @map("sort_order")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  media   Media   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, mediaId])
+  @@map("content_media")
+}
+
+// ── Comment ────────────────────────────────────────────────
+
+model Comment {
+  id         String        @id @default(uuid())
+  contentId  String        @map("content_id")
+  parentId   String?       @map("parent_id")
+  userId     String?       @map("user_id")
+  guestName  String?       @map("guest_name")
+  guestEmail String?       @map("guest_email")
+  body       String
+  status     CommentStatus @default(pending)
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  content Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentThread")
+  user    User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([contentId, status])
+  @@map("comments")
+}
+
+// ── Menu / Widget ──────────────────────────────────────────
+
+model Menu {
+  id    String     @id @default(uuid())
+  name  String
+  slug  String     @unique
+  items MenuItem[]
+
+  @@map("menus")
+}
+
+model MenuItem {
+  id        String  @id @default(uuid())
+  menuId    String  @map("menu_id")
+  label     String
+  url       String?
+  contentId String? @map("content_id")
+  parentId  String? @map("parent_id")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  menu    Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  content Content?   @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  parent  MenuItem?  @relation("MenuItemTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children MenuItem[] @relation("MenuItemTree")
+
+  @@map("menu_items")
+}
+
+model WidgetArea {
+  id      String   @id @default(uuid())
+  slug    String   @unique
+  label   String
+  widgets Widget[]
+
+  @@map("widget_areas")
+}
+
+model Widget {
+  id           String @id @default(uuid())
+  widgetAreaId String @map("widget_area_id")
+  type         String
+  settingsJson Json   @default("{}") @map("settings_json")
+  sortOrder    Int    @default(0) @map("sort_order")
+
+  widgetArea WidgetArea @relation(fields: [widgetAreaId], references: [id], onDelete: Cascade)
+
+  @@map("widgets")
+}
+
+// ── Settings ───────────────────────────────────────────────
+
+model Setting {
+  key      String  @id
+  value    Json
+  autoload Boolean @default(true)
+
+  @@map("settings")
+}
+
+// ── Redirect ───────────────────────────────────────────────
+
+model Redirect {
+  id         String       @id @default(uuid())
+  fromPath   String       @unique @map("from_path")
+  toPath     String       @map("to_path")
+  statusCode RedirectCode @default(r301) @map("status_code")
+  hitCount   Int          @default(0) @map("hit_count")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  @@map("redirects")
+}
+
+// ── Webhook ────────────────────────────────────────────────
+
+model Webhook {
+  id        String   @id @default(uuid())
+  event     String
+  targetUrl String   @map("target_url")
+  secret    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  deliveries WebhookDelivery[]
+
+  @@index([event, active])
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id             String    @id @default(uuid())
+  webhookId      String    @map("webhook_id")
+  payload        Json
+  responseStatus Int?      @map("response_status")
+  attempt        Int       @default(1)
+  deliveredAt    DateTime? @map("delivered_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@map("webhook_deliveries")
+}
+
+// ── Audit log (titik pencatatan disiapkan sejak awal) ──────
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([action])
+  @@index([actorId])
+  @@map("audit_logs")
+}

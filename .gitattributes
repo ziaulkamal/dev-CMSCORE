@@ -1,0 +1,5 @@
+# Normalisasi line-ending: LF di repo, biarkan Windows checkout sesuai lokal.
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
