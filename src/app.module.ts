@@ -33,6 +33,10 @@ import { SettingModule } from './modules/settings/settings.module';
 import { RedirectModule } from './modules/redirects/redirects.module';
 import { WebhookModule } from './modules/webhooks/webhooks.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { FeedModule } from './modules/feed/feed.module';
+import { AdsModule } from './modules/ads/ads.module';
+import { PopupsModule } from './modules/popups/popups.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -79,6 +83,10 @@ import { AuditModule } from './modules/audit/audit.module';
     RedirectModule,
     WebhookModule,
     AuditModule,
+    FeedModule,
+    AdsModule,
+    PopupsModule,
+    DashboardModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

@@ -42,12 +42,17 @@ enum RedirectCode {
 // ── RBAC: User / Role / Capability ─────────────────────────
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  status       String   @default("active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  status        String    @default("active")
+  displayName   String?   @map("display_name")
+  avatarMediaId String?   @map("avatar_media_id")
+  lastLoginAt   DateTime? @map("last_login_at")
+  bannedAt      DateTime? @map("banned_at")
+  bannedReason  String?   @map("banned_reason")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   roles            UserRole[]
   apiKeys          ApiKey[]
@@ -58,6 +63,7 @@ model User {
   comments         Comment[]
   authorProfile    Author?
   auditLogs        AuditLog[]
+  avatarMedia      Media?            @relation("UserAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
 
   @@map("users")
 }
@@ -299,6 +305,7 @@ model Media {
   featuredFor     Content[]      @relation("ContentFeatured")
   attachedTo      ContentMedia[]
   authorAvatars   Author[]       @relation("AuthorAvatar")
+  userAvatars     User[]         @relation("UserAvatar")
 
   @@map("media")
 }
@@ -353,6 +360,8 @@ model MenuItem {
   menuId    String  @map("menu_id")
   label     String
   url       String?
+  source    String  @default("custom") // 'custom' | 'page' | 'category'
+  refId     String? @map("ref_id") // id entitas sumber (content/term) bila bukan custom
   contentId String? @map("content_id")
   parentId  String? @map("parent_id")
   sortOrder Int     @default(0) @map("sort_order")
@@ -384,6 +393,54 @@ model Widget {
   widgetArea WidgetArea @relation(fields: [widgetAreaId], references: [id], onDelete: Cascade)
 
   @@map("widgets")
+}
+
+// ── Ad Slots (req #8: posisi iklan/widget bertipe) ─────────
+
+model AdSlot {
+  id        String   @id @default(uuid())
+  name      String
+  kind      String // 'image' | 'javascript' | 'adsense'
+  position  String // enum posisi (lihat ads module)
+  active    Boolean  @default(true)
+  // payload per-kind disimpan sebagai JSON (DRY, hindari kolom sparse):
+  //   image:              { image_media_id, target_url, alt }
+  //   javascript:         { script }
+  //   adsense:            { client_id, slot_id }
+  config    Json     @default("{}")
+  // opsi tata letak (mis. paragraph_index, delay_seconds, dismissible):
+  options   Json     @default("{}")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([position, active])
+  @@map("ad_slots")
+}
+
+// ── Popup ──────────────────────────────────────────────────
+
+model Popup {
+  id        String   @id @default(uuid())
+  name      String
+  kind      String // 'html' | 'image'
+  active    Boolean  @default(true)
+  // konten per-kind disimpan sebagai JSON (DRY):
+  //   html:  { html }
+  //   image: { image_media_id, target_url, alt }
+  content   Json     @default("{}")
+  // aturan tampil: { scope: 'root'|'all_public', delay_seconds, auto_close_seconds,
+  //                  frequency: 'always'|'session'|'days', frequency_days }
+  display   Json     @default("{}")
+  // rentang penayangan (opsional); null = tak terbatas di sisi itu.
+  startAt   DateTime? @map("start_at")
+  endAt     DateTime? @map("end_at")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([active, startAt, endAt])
+  @@map("popups")
 }
 
 // ── Settings ───────────────────────────────────────────────

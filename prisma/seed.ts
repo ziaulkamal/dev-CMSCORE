@@ -17,6 +17,7 @@ const CAPABILITIES = [
   'manage_comments',
   'manage_media',
   'manage_users',
+  'ban_users',
   'manage_roles',
   'manage_settings',
   'read',

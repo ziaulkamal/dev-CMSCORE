@@ -10,7 +10,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { AuthRepository } from './auth.repository';
 import { LoginDto } from './dto/login.dto';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
-import { UnauthorizedError } from '../../common/errors/domain.error';
+import { ConflictError, UnauthorizedError } from '../../common/errors/domain.error';
 import type { JwtConfig } from '../../common/config/configuration';
 
 export interface TokenBundle {
@@ -48,7 +48,58 @@ export class AuthService {
     const valid = await argon2.verify(user.passwordHash, dto.password);
     if (!valid) throw new UnauthorizedError('Kredensial tidak valid');
 
+    await this.authRepo.touchLastLogin(user.id);
     return this.issueTokens(user.id);
+  }
+
+  /** Profil lengkap (principal + display_name, avatar_url, last_login_at). */
+  async getMe(userId: string) {
+    const access = await this.authRepo.findUserWithAccess(userId);
+    if (!access) throw new UnauthorizedError('Sesi tidak valid');
+    return {
+      id: access.id,
+      email: access.email,
+      display_name: access.displayName,
+      avatar_media_id: access.avatarMediaId,
+      avatar_url: access.avatarUrl,
+      last_login_at: access.lastLoginAt,
+      roles: access.roles,
+      capabilities: access.capabilities,
+    };
+  }
+
+  /** Update profil self-service; cegah email bentrok dengan user lain. */
+  async updateProfile(
+    userId: string,
+    dto: { display_name?: string | null; email?: string; avatar_media_id?: string | null },
+  ) {
+    if (dto.email) {
+      const dup = await this.authRepo.findUserByEmail(dto.email);
+      if (dup && dup.id !== userId) throw new ConflictError('EMAIL_EXISTS', 'Email sudah terdaftar');
+    }
+    await this.authRepo.updateProfile(userId, {
+      ...(dto.display_name !== undefined ? { displayName: dto.display_name } : {}),
+      ...(dto.email !== undefined ? { email: dto.email } : {}),
+      ...(dto.avatar_media_id !== undefined ? { avatarMediaId: dto.avatar_media_id } : {}),
+    });
+    return this.getMe(userId);
+  }
+
+  /** Ganti password: verifikasi password lama, lalu hash yang baru. */
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.authRepo.findUserById(userId);
+    if (!user) throw new UnauthorizedError('Sesi tidak valid');
+    const valid = await argon2.verify(user.passwordHash, currentPassword);
+    if (!valid) throw new UnauthorizedError('Password saat ini tidak sesuai');
+    await this.authRepo.updatePassword(userId, await argon2.hash(newPassword));
+    // Cabut seluruh sesi lain agar password lama tak bisa lagi dipakai.
+    await this.authRepo.revokeAllRefreshTokens(userId);
+  }
+
+  /** Nonaktifkan akun sendiri (sukarela) + cabut seluruh refresh token. */
+  async deactivateSelf(userId: string) {
+    await this.authRepo.deactivateUser(userId);
+    await this.authRepo.revokeAllRefreshTokens(userId);
   }
 
   /** Rotasi refresh token; deteksi reuse → cabut seluruh rantai (PRD §8). */

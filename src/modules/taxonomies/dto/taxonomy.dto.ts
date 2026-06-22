@@ -19,6 +19,19 @@ export class CreateTaxonomyDto {
   hierarchical?: boolean;
 }
 
+export class UpdateTaxonomyDto {
+  @ApiPropertyOptional({ example: 'Category', maxLength: 120 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  label?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  hierarchical?: boolean;
+}
+
 export class CreateTermDto {
   @ApiProperty({ example: 'Politik', maxLength: 120 })
   @IsString()
@@ -44,4 +57,28 @@ export class CreateTermDto {
   @IsOptional()
   @IsString()
   parent_id?: string;
+}
+
+export class UpdateTermDto {
+  @ApiPropertyOptional({ example: 'Politik', maxLength: 120 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string;
+
+  @ApiPropertyOptional({ example: 'politik', maxLength: 120 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  slug?: string;
+
+  @ApiPropertyOptional({ description: 'Deskripsi term' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'ID term induk; null untuk jadikan root' })
+  @IsOptional()
+  @IsString()
+  parent_id?: string | null;
 }

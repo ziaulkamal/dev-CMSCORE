@@ -19,6 +19,7 @@ export class AuthRepository {
         roles: {
           include: { role: { include: { capabilities: { include: { capability: true } } } } },
         },
+        avatarMedia: { select: { fileUrl: true } },
       },
     });
     if (!user) return null;
@@ -27,7 +28,46 @@ export class AuthRepository {
     const capabilities = [
       ...new Set(user.roles.flatMap((ur) => ur.role.capabilities.map((rc) => rc.capability.key))),
     ];
-    return { id: user.id, email: user.email, status: user.status, roles, capabilities };
+    return {
+      id: user.id,
+      email: user.email,
+      status: user.status,
+      displayName: user.displayName,
+      avatarMediaId: user.avatarMediaId,
+      avatarUrl: user.avatarMedia?.fileUrl ?? null,
+      lastLoginAt: user.lastLoginAt,
+      roles,
+      capabilities,
+    };
+  }
+
+  /** Tandai waktu login terakhir (dipanggil setelah login sukses). */
+  touchLastLogin(userId: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { lastLoginAt: new Date() },
+    });
+  }
+
+  findUserById(id: string) {
+    return this.prisma.user.findUnique({ where: { id } });
+  }
+
+  /** Update profil self-service (display_name, email, avatar). */
+  updateProfile(
+    userId: string,
+    data: { displayName?: string | null; email?: string; avatarMediaId?: string | null },
+  ) {
+    return this.prisma.user.update({ where: { id: userId }, data });
+  }
+
+  updatePassword(userId: string, passwordHash: string) {
+    return this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  }
+
+  /** Nonaktifkan akun sendiri (sukarela; berbeda dari ban). */
+  deactivateUser(userId: string) {
+    return this.prisma.user.update({ where: { id: userId }, data: { status: 'inactive' } });
   }
 
   createRefreshToken(data: {
