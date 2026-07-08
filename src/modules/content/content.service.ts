@@ -7,6 +7,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ContentStatus, Prisma } from '@prisma/client';
 import { ContentRepository } from './content.repository';
 import { ScheduledPublishService } from './scheduled-publish.service';
+import { AuthorService } from '../authors/authors.service';
 import { APP_EVENTS } from '../../common/events/app-events';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
@@ -36,12 +37,18 @@ export class ContentService {
     private readonly repo: ContentRepository,
     private readonly scheduler: ScheduledPublishService,
     private readonly events: EventEmitter2,
+    private readonly authors: AuthorService,
   ) {}
 
   /** Buat content + meta + authors + terms dalam satu transaksi. */
   async create(dto: CreateContentDto, user: AuthenticatedUser) {
     const slug = await this.uniqueSlug(dto.type, dto.title);
     const meta = this.filterMeta(dto.type, dto.meta);
+
+    // Default penulis utama = penulis yang ter-link ke user login (auto-buat
+    // bila belum ada). Bisa di-override bila dto.primary_author_id dikirim.
+    const primaryAuthorId =
+      dto.primary_author_id ?? (await this.authors.ensureAuthorForUser(user.id));
 
     return this.repo.client.$transaction(async (tx) => {
       const content = await tx.content.create({
@@ -53,12 +60,12 @@ export class ContentService {
           excerpt: dto.excerpt ?? null,
           parentId: dto.parent_id ?? null,
           featuredMediaId: dto.featured_media_id ?? null,
-          primaryAuthorId: dto.primary_author_id ?? null,
+          primaryAuthorId,
           createdById: user.id,
         },
       });
 
-      await this.persistRelations(tx, content.id, dto, meta);
+      await this.persistRelations(tx, content.id, { ...dto, primary_author_id: primaryAuthorId }, meta);
       return tx.content.findUniqueOrThrow({
         where: { id: content.id },
         include: ContentRepository.detailInclude,
@@ -101,6 +108,16 @@ export class ContentService {
     return content;
   }
 
+  /** Detail konten via slug (slug unik per type; type opsional bila ingin batasi). */
+  async findBySlug(slug: string, type?: string, user?: AuthenticatedUser) {
+    const content = await this.repo.findBySlug(slug, type);
+    if (!content) throw new NotFoundError('Content tidak ditemukan');
+    if (content.status !== 'published' && !user) {
+      throw new NotFoundError('Content tidak ditemukan');
+    }
+    return content;
+  }
+
   /** Soft-delete (trash) via transisi; bukan hard delete. */
   async trash(id: string, user: AuthenticatedUser) {
     await this.getOwnedOrThrow(id, user, 'delete');
@@ -120,6 +137,41 @@ export class ContentService {
       where.status = query.status;
     } else if (!user) {
       where.status = 'published'; // anonim hanya melihat published
+    }
+
+    // Filter term: cocokkan by id ATAU slug; opsional dibatasi taxonomy.
+    if (query.term) {
+      where.terms = {
+        some: {
+          term: {
+            OR: [{ id: query.term }, { slug: query.term }],
+            ...(query.taxonomy ? { taxonomy: { slug: query.taxonomy } } : {}),
+          },
+        },
+      };
+    }
+
+    // Filter author: cocokkan primary atau co-author byline.
+    if (query.author) {
+      where.OR = [
+        { primaryAuthorId: query.author },
+        { authors: { some: { authorId: query.author } } },
+      ];
+    }
+
+    // Pencarian sederhana: judul atau excerpt mengandung kata kunci.
+    if (query.q) {
+      const q = query.q.trim();
+      if (q) {
+        where.AND = [
+          {
+            OR: [
+              { title: { contains: q, mode: 'insensitive' } },
+              { excerpt: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+        ];
+      }
     }
 
     const rows = await this.repo.listFeed({ where, cursor, limit, direction });

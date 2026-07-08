@@ -37,6 +37,7 @@ import { FeedModule } from './modules/feed/feed.module';
 import { AdsModule } from './modules/ads/ads.module';
 import { PopupsModule } from './modules/popups/popups.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { SeedModule } from './modules/seed/seed.module';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     AdsModule,
     PopupsModule,
     DashboardModule,
+    SeedModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

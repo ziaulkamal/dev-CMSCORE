@@ -26,6 +26,14 @@ export class ContentRepository {
     return this.prisma.content.findUnique({ where: { id }, include: DETAIL_INCLUDE });
   }
 
+  /** Cari konten per slug (opsional dibatasi type bila slug hanya unik per type). */
+  findBySlug(slug: string, type?: string) {
+    return this.prisma.content.findFirst({
+      where: { slug, ...(type ? { type } : {}) },
+      include: DETAIL_INCLUDE,
+    });
+  }
+
   /** Cek apakah slug sudah dipakai untuk type tertentu (slug unik per type). */
   slugExists(type: string, slug: string, exceptId?: string) {
     return this.prisma.content.findFirst({

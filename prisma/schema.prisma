@@ -263,6 +263,7 @@ model Term {
   name        String
   slug        String
   description String?
+  color       String? // hex warna kategori (mis. #C8102E) untuk badge publik
   parentId    String? @map("parent_id")
 
   taxonomy Taxonomy      @relation(fields: [taxonomyId], references: [id], onDelete: Cascade)

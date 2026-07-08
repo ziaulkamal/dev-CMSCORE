@@ -8,6 +8,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import type { AppConfig } from './common/config/configuration';
+import { validationExceptionFactory } from './common/validation/validation-exception.factory';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
@@ -24,6 +25,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
+      // Pesan error per-field (code VALIDATION_ERROR + details) agar UI bisa
+      // menandai field yang gagal, bukan sekadar 400 generik.
+      exceptionFactory: validationExceptionFactory,
     }),
   );
 

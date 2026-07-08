@@ -20,6 +20,7 @@ interface TermRow {
   name: string;
   slug: string;
   description: string | null;
+  color: string | null;
   parentId: string | null;
 }
 
@@ -31,6 +32,7 @@ function toTermDto(t: TermRow) {
     name: t.name,
     slug: t.slug,
     description: t.description,
+    color: t.color,
     parent_id: t.parentId,
   };
 }
@@ -77,6 +79,7 @@ export class TaxonomyService {
         name: dto.name,
         slug,
         description: dto.description ?? null,
+        color: dto.color ?? null,
         parentId: dto.parent_id ?? null,
       },
     });
@@ -131,6 +134,7 @@ export class TaxonomyService {
         name: dto.name ?? term.name,
         slug,
         description: dto.description ?? term.description,
+        color: dto.color ?? term.color,
         parentId,
       },
     });

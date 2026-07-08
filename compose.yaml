@@ -14,7 +14,9 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
     ports:
-      - "3000:3000"
+      # Host 40200 → container 3000 (API NestJS). Bind 127.0.0.1: hanya dari mesin
+      # ini (browser lokal). Ubah ke "40200:3000" bila perlu akses dari LAN.
+      - "127.0.0.1:40200:3000"
     volumes:
       # Mount source untuk hot-reload; node_modules tetap milik container.
       - ./src:/app/src:z
@@ -39,7 +41,10 @@ services:
       POSTGRES_PASSWORD: cms_secret
       POSTGRES_DB: cmscore
     ports:
-      - "5432:5432"
+      # Host 40202 → container 5432. Bind 127.0.0.1 saja: aplikasi memakai jaringan
+      # internal (postgres:5432); expose ini HANYA untuk tool desktop (DBeaver/pgAdmin)
+      # dari mesin ini. TIDAK terjangkau jaringan luar.
+      - "127.0.0.1:40202:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -53,7 +58,10 @@ services:
     image: docker.io/library/redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      # Host 40203 → container 6379. Bind 127.0.0.1 saja: aplikasi memakai jaringan
+      # internal (redis:6379); expose ini HANYA untuk RedisInsight dari mesin ini.
+      # Redis tanpa password → JANGAN ekspos ke jaringan luar.
+      - "127.0.0.1:40203:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -70,8 +78,12 @@ services:
       MINIO_ROOT_USER: cms_minio
       MINIO_ROOT_PASSWORD: cms_minio_secret
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      # Host 40204 → container 9000 (MinIO S3 API). Diakses browser via
+      # MINIO_PUBLIC_URL untuk load media. Bind 127.0.0.1 (browser lokal).
+      - "127.0.0.1:40204:9000"
+      # Host 40205 → container 9001 (MinIO Console web). Dashboard admin manual;
+      # tidak dipakai aplikasi. Bind 127.0.0.1 saja.
+      - "127.0.0.1:40205:9001"
     volumes:
       - miniodata:/data
     healthcheck:

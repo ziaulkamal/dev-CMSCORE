@@ -39,6 +39,21 @@ export class ContentController {
   }
 
   @Public()
+  @Get('by-slug/:slug')
+  @ApiOperation({
+    summary: 'Detail konten via slug',
+    description: 'Anonim hanya melihat published. Gunakan ?type untuk membatasi tipe.',
+  })
+  @ApiResponse({ status: 404, description: 'Tidak ditemukan / tidak boleh diakses.' })
+  async findBySlug(
+    @Param('slug') slug: string,
+    @Query('type') type: string | undefined,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    return ok(await this.content.findBySlug(slug, type, user));
+  }
+
+  @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Detail konten' })
   @ApiResponse({ status: 404, description: 'Tidak ditemukan / tidak boleh diakses.' })

@@ -112,8 +112,14 @@ Profil user login (id, email, roles, capabilities). **UI:** tampilkan nama/avata
 Feed konten. **Anonim hanya menerima konten `published`.** Filter & cursor pagination.
 ```
 GET /v1/contents?type=post&limit=20&sort=-published_at
-GET /v1/contents?type=post&cursor=eyJ...           # halaman berikutnya
+GET /v1/contents?type=post&cursor=eyJ...                 # halaman berikutnya
+GET /v1/contents?term=politik                            # filter term (id ATAU slug)
+GET /v1/contents?taxonomy=category&term=politik          # batasi pencocokan ke taxonomy
+GET /v1/contents?author=au_andi                          # konten dgn byline author (primary/co)
+GET /v1/contents?q=pemilu                                # cari di judul/excerpt (insensitive)
 ```
+**Filter tambahan:** `term` (id atau slug), `taxonomy` (batasi `term` ke slug taxonomy ini),
+`author` (id byline; cocok primary ATAU co-author), `q` (kata kunci judul/excerpt).
 ```json
 // response
 {
@@ -132,7 +138,17 @@ Detail satu konten. **Anonim hanya bisa membuka konten `published`** (selain itu
 { "data": { "id": "ct_99", "type": "post", "title": "…", "slug": "…", "body": "<p>…</p>",
   "status": "published", "published_at": "…", "authors": [...], "terms": [...], "metas": [...] } }
 ```
-**UI:** halaman detail artikel. (Catatan: bisa juga ambil per-slug dengan filter listing.)
+**UI:** halaman detail artikel.
+
+#### `GET /v1/contents/by-slug/:slug` — Public
+Detail satu konten via slug (slug hiasan SEO jadi sumber lookup, bukan id). Opsional `?type=`
+untuk membatasi tipe (slug unik per type). **Anonim hanya bisa membuka `published`** (selain
+itu 404). Bentuk response sama dengan `GET /v1/contents/:id`.
+```
+GET /v1/contents/by-slug/judul-artikel
+GET /v1/contents/by-slug/judul-artikel?type=post
+```
+**UI:** ArticleView pakai route `/artikel/:slug` tanpa perlu id.
 
 #### `GET /v1/contents/:id/meta` — Public
 Meta EAV konten (field CPT + SEO) sebagai map key-value.
@@ -325,9 +341,13 @@ POST /v1/media   (multipart/form-data)
 | `GET /v1/taxonomies` | publik | Daftar taxonomy. |
 | `POST /v1/taxonomies` | `manage_settings` | Buat taxonomy (`slug`, `label`, `hierarchical`). |
 | `GET /v1/taxonomies/:slug/terms` | publik | Daftar term. |
-| `POST /v1/taxonomies/:slug/terms` | `manage_settings` | Buat term (`name`, `slug?`, `parent_id?`). |
+| `POST /v1/taxonomies/:slug/terms` | `manage_settings` | Buat term (`name`, `slug?`, `color?`, `parent_id?`). |
 
-**UI:** halaman kelola kategori/tag; form tambah term (dropdown parent untuk hierarki).
+**Field `color` (opsional, hex `#RRGGBB`):** warna badge kategori; ikut di response term
+(`color`) dan di `terms[]` pada detail konten. Pakai untuk badge kategori berwarna di public
+(menggantikan hardcode `category_color`).
+
+**UI:** halaman kelola kategori/tag; form tambah term (dropdown parent untuk hierarki, color picker).
 
 ---
 
@@ -338,6 +358,7 @@ POST /v1/media   (multipart/form-data)
 | `GET /v1/authors` | publik | Daftar author. |
 | `POST /v1/authors` | `manage_users` | Buat author byline. |
 | `PUT /v1/authors/:id` | `manage_users` | Update author. |
+| `DELETE /v1/authors/:id` | `manage_users` | Hapus author. **409 `AUTHOR_IN_USE`** bila masih dipakai byline konten. |
 
 ```json
 // POST/PUT request

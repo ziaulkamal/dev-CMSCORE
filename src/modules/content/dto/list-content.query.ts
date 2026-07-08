@@ -28,4 +28,30 @@ export class ListContentQuery {
   @IsOptional()
   @IsString()
   sort?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter term (id atau slug). Mengembalikan konten yang punya term ini.',
+    example: 'politik',
+  })
+  @IsOptional()
+  @IsString()
+  term?: string;
+
+  @ApiPropertyOptional({
+    description: 'Slug taxonomy untuk membatasi pencocokan `term` (mis. category).',
+    example: 'category',
+  })
+  @IsOptional()
+  @IsString()
+  taxonomy?: string;
+
+  @ApiPropertyOptional({ description: 'Filter author (id) byline.', example: 'uuid-author' })
+  @IsOptional()
+  @IsString()
+  author?: string;
+
+  @ApiPropertyOptional({ description: 'Kata kunci pencarian (judul/excerpt).', example: 'pemilu' })
+  @IsOptional()
+  @IsString()
+  q?: string;
 }

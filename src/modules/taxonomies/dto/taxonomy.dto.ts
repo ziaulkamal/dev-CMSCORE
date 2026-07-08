@@ -1,6 +1,6 @@
 // src/modules/taxonomies/dto/taxonomy.dto.ts — payload taxonomy & term (PRD §10.1).
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsHexColor, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateTaxonomyDto {
   @ApiProperty({ example: 'category', maxLength: 60 })
@@ -53,6 +53,11 @@ export class CreateTermDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({ example: '#C8102E', description: 'Warna hex badge kategori' })
+  @IsOptional()
+  @IsHexColor()
+  color?: string;
+
   @ApiPropertyOptional({ description: 'ID term induk (hierarki)' })
   @IsOptional()
   @IsString()
@@ -76,6 +81,11 @@ export class UpdateTermDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({ example: '#C8102E', description: 'Warna hex badge kategori' })
+  @IsOptional()
+  @IsHexColor()
+  color?: string;
 
   @ApiPropertyOptional({ description: 'ID term induk; null untuk jadikan root' })
   @IsOptional()

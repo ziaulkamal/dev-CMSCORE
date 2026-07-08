@@ -2,8 +2,8 @@
  * src/modules/authors/authors.controller.ts
  * Endpoint author (PRD §10.1). Baca publik; tulis butuh manage_users.
  */
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthorService } from './authors.service';
 import { CreateAuthorDto, UpdateAuthorDto } from './dto/author.dto';
 import { Public } from '../../common/decorators/public.decorator';
@@ -36,5 +36,14 @@ export class AuthorController {
   @ApiOperation({ summary: 'Update author' })
   async update(@Param('id') id: string, @Body() dto: UpdateAuthorDto) {
     return ok(await this.service.update(id, dto));
+  }
+
+  @RequireCapabilities('manage_users')
+  @ApiBearerAuth('bearer')
+  @Delete(':id')
+  @ApiOperation({ summary: 'Hapus author' })
+  @ApiResponse({ status: 409, description: 'AUTHOR_IN_USE — masih dipakai byline konten.' })
+  async remove(@Param('id') id: string) {
+    return ok(await this.service.remove(id));
   }
 }

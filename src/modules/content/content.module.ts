@@ -8,9 +8,13 @@ import { ContentLockService } from './content-lock.service';
 import { ScheduledPublishService } from './scheduled-publish.service';
 import { ScheduledPublishProcessor } from './scheduled-publish.processor';
 import { QUEUE_SCHEDULED_PUBLISH } from '../../common/queue/queue.constants';
+import { AuthorModule } from '../authors/authors.module';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: QUEUE_SCHEDULED_PUBLISH })],
+  imports: [
+    BullModule.registerQueue({ name: QUEUE_SCHEDULED_PUBLISH }),
+    AuthorModule,
+  ],
   controllers: [ContentController],
   providers: [
     ContentService,
