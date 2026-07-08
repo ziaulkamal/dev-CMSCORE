@@ -1,0 +1,41 @@
+# Dockerfile.prod — image PRODUKSI CMS Core (multi-stage, ramping).
+# Stage build: install semua deps + kompilasi TypeScript ke dist/.
+# Stage runtime: hanya deps produksi + hasil build → image kecil, tanpa toolchain dev.
+
+# ── Stage 1: build ────────────────────────────────────────────────
+FROM node:22-alpine AS build
+RUN apk add --no-cache openssl
+RUN corepack enable
+WORKDIR /app
+
+# Install SEMUA dependency (termasuk dev) untuk build + prisma generate.
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --frozen-lockfile || pnpm install
+
+COPY . .
+RUN pnpm prisma generate
+RUN pnpm run build                 # → dist/main.js
+
+# Pangkas ke dependency produksi saja (dipakai ulang di runtime).
+RUN pnpm prune --prod
+
+# ── Stage 2: runtime ──────────────────────────────────────────────
+FROM node:22-alpine AS runtime
+RUN apk add --no-cache openssl netcat-openbsd
+RUN corepack enable
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Bawa hanya yang perlu dari stage build.
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/package.json ./package.json
+
+# Entrypoint: tunggu DB → migrate deploy → start.
+COPY docker/entrypoint.prod.sh /usr/local/bin/entrypoint.prod.sh
+RUN chmod +x /usr/local/bin/entrypoint.prod.sh
+
+EXPOSE 3000
+ENTRYPOINT ["entrypoint.prod.sh"]
+CMD ["node", "dist/main.js"]
