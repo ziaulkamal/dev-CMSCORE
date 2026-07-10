@@ -4,46 +4,14 @@
  */
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
+import {
+  CAPABILITIES,
+  ROLES,
+  DEFAULT_ADMIN_EMAIL,
+  DEFAULT_ADMIN_PASSWORD,
+} from '../src/common/bootstrap/rbac.constants';
 
 const prisma = new PrismaClient();
-
-/** Daftar capability sesuai matriks RBAC PRD §9. */
-const CAPABILITIES = [
-  'edit_post',
-  'edit_others_post',
-  'publish_post',
-  'delete_post',
-  'override_lock',
-  'manage_comments',
-  'manage_media',
-  'manage_users',
-  'ban_users',
-  'manage_roles',
-  'manage_settings',
-  'read',
-] as const;
-
-/** Mapping role → capabilities (PRD §9). */
-const ROLES: Record<string, { label: string; caps: string[] }> = {
-  super_admin: { label: 'Super Admin', caps: [...CAPABILITIES] },
-  admin: { label: 'Admin', caps: [...CAPABILITIES] },
-  editor: {
-    label: 'Editor',
-    caps: [
-      'edit_post',
-      'edit_others_post',
-      'publish_post',
-      'delete_post',
-      'override_lock',
-      'manage_comments',
-      'manage_media',
-      'read',
-    ],
-  },
-  author: { label: 'Author', caps: ['edit_post', 'manage_media', 'read'] },
-  contributor: { label: 'Contributor', caps: ['edit_post', 'read'] },
-  viewer: { label: 'Viewer', caps: ['read'] },
-};
 
 async function seedCapabilities() {
   for (const key of CAPABILITIES) {
@@ -71,8 +39,8 @@ async function seedRoles() {
 }
 
 async function seedSuperAdmin() {
-  const email = process.env.SEED_ADMIN_EMAIL ?? 'admin@cmscore.local';
-  const password = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMe123!';
+  const email = process.env.SEED_ADMIN_EMAIL ?? DEFAULT_ADMIN_EMAIL;
+  const password = process.env.SEED_ADMIN_PASSWORD ?? DEFAULT_ADMIN_PASSWORD;
   const passwordHash = await argon2.hash(password);
 
   const user = await prisma.user.upsert({
