@@ -137,6 +137,10 @@ export class ContentService {
       where.status = query.status;
     } else if (!user) {
       where.status = 'published'; // anonim hanya melihat published
+    } else {
+      // User login tanpa filter status: sembunyikan yang di-trash (soft-delete)
+      // dari feed default. Untuk melihat sampah, minta ?status=trashed eksplisit.
+      where.status = { not: 'trashed' };
     }
 
     // Filter term: cocokkan by id ATAU slug; opsional dibatasi taxonomy.
