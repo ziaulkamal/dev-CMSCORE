@@ -12,12 +12,14 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import type { RedisConfig } from './common/config/configuration';
 
 import configuration from './common/config/configuration';
+import { validateEnv } from './common/config/env.validation';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { RedisModule } from './common/redis/redis.module';
 import { StorageModule } from './common/storage/storage.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { CapabilitiesGuard } from './common/guards/capabilities.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { BootstrapModule } from './common/bootstrap/bootstrap.module';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { ContentModule } from './modules/content/content.module';
@@ -41,7 +43,7 @@ import { SeedModule } from './modules/seed/seed.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
+    ConfigModule.forRoot({ isGlobal: true, load: [configuration], validate: validateEnv }),
     EventEmitterModule.forRoot(),
     BullModule.forRootAsync({
       inject: [ConfigService],
@@ -70,6 +72,7 @@ import { SeedModule } from './modules/seed/seed.module';
     PrismaModule,
     RedisModule,
     StorageModule,
+    BootstrapModule,
     AuthModule,
     ContentModule,
     UserModule,
