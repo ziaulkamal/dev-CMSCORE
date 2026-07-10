@@ -1,5 +1,8 @@
 node_modules
 dist
+# Cegah state incremental basi (tsc/nest) mencemari build container → tsc skip
+# emit file yang tak berubah, dist/ jadi tak lengkap, app crash MODULE_NOT_FOUND.
+*.tsbuildinfo
 .git
 .gitignore
 .env
